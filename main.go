@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -11,61 +12,85 @@ import (
 )
 
 var (
-	inFile       = flag.String("f", "", "file to parse")
-	exprMode     = flag.String("e", "", "expression to parse")
-	templateMode = flag.String("t", "", "template to parse")
+	exprMode     = flag.Bool("e", false, "parse as expression")
+	templateMode = flag.Bool("t", false, "parse as template")
 )
 
 func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	var node hclsyntax.Node
-	var bytes []byte
-
-	// TODO:
-	// - add support file argument
-	// - add support stdin
-	// - improve diagnostics writer
-
-	if inFile != nil && *inFile != "" {
-		f, err := os.ReadFile(*inFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error reading file: %s\n", err)
-			os.Exit(1)
-		}
-		file, diags := hclsyntax.ParseConfig(f, *inFile, hcl.InitialPos)
-		if diags.HasErrors() {
-			fmt.Fprintf(os.Stderr, "error parsing file: %s\n", diags)
-			os.Exit(1)
-		}
-		node = file.Body.(*hclsyntax.Body)
-		bytes = file.Bytes
-	} else if exprMode != nil && *exprMode != "" {
-		expr, diags := hclsyntax.ParseExpression([]byte(*exprMode), "<expr>", hcl.InitialPos)
-		if diags.HasErrors() {
-			fmt.Fprintf(os.Stderr, "error parsing expression: %s\n", diags)
-			os.Exit(1)
-		}
-		node = expr
-		bytes = []byte(*exprMode)
-	} else if templateMode != nil && *templateMode != "" {
-		expr, diags := hclsyntax.ParseTemplate([]byte(*templateMode), "<template>", hcl.InitialPos)
-		if diags.HasErrors() {
-			fmt.Fprintf(os.Stderr, "error parsing template: %s\n", diags)
-			os.Exit(1)
-		}
-		node = expr
-		bytes = []byte(*templateMode)
-	} else {
-		usage()
+	if flag.NArg() > 1 {
+		fmt.Fprintf(os.Stderr, "only one file or content can be specified\n")
+		os.Exit(2)
 	}
 
-	hclsyntax.Walk(node, &walker{file: bytes})
+	if flag.NArg() == 0 {
+		os.Exit(processFile("<stdin>", os.Stdin))
+	}
+
+	var fn string
+	var in io.Reader
+	if *exprMode || *templateMode {
+		fn = "<inline>"
+		in = strings.NewReader(flag.Arg(0))
+	} else {
+		fn = flag.Arg(0)
+		in = nil
+	}
+	os.Exit(processFile(fn, in))
+}
+
+func processFile(fn string, in io.Reader) int {
+	var err error
+	if in == nil {
+		in, err = os.Open(fn)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to open %s: %s\n", fn, err)
+			return 1
+		}
+	}
+
+	inSrc, err := io.ReadAll(in)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to read %s: %s\n", fn, err)
+		return 1
+	}
+
+	var node hclsyntax.Node
+	var diags hcl.Diagnostics
+	if *exprMode {
+		node, diags = hclsyntax.ParseExpression(inSrc, fn, hcl.InitialPos)
+	} else if *templateMode {
+		node, diags = hclsyntax.ParseTemplate(inSrc, fn, hcl.InitialPos)
+	} else {
+		file, d := hclsyntax.ParseConfig(inSrc, fn, hcl.InitialPos)
+		node = file.Body.(*hclsyntax.Body)
+		diags = d
+	}
+
+	if diags.HasErrors() {
+		fmt.Fprintf(os.Stderr, "failed to parse. %d diagnostic(s):\n\n", len(diags))
+		for _, diag := range diags {
+			fmt.Fprintf(os.Stderr, "%s: %s\n", diag.Summary, diag.Detail)
+		}
+		return 1
+	}
+
+	diags = hclsyntax.Walk(node, &walker{file: inSrc})
+	if diags.HasErrors() {
+		fmt.Fprintf(os.Stderr, "failed to walk. %d diagnostic(s):\n\n", len(diags))
+		for _, diag := range diags {
+			fmt.Fprintf(os.Stderr, "%s: %s\n", diag.Summary, diag.Detail)
+		}
+		return 1
+	}
+
+	return 0
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: hclparse [options]\n")
+	fmt.Fprintf(os.Stderr, "usage: hclparse [options] [file or content]\n")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
