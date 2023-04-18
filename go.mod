@@ -1,4 +1,4 @@
-module github.com/wata727/hcl-parse
+module github.com/terraform-linters/hcl-parse
 
 go 1.20
 

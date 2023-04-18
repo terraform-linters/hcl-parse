@@ -11,14 +11,22 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 )
 
+const versionStr = "0.0.1-dev"
+
 var (
 	exprMode     = flag.Bool("e", false, "parse as expression")
 	templateMode = flag.Bool("t", false, "parse as template")
+	showVersion  = flag.Bool("version", false, "show the version number and immediately exit")
 )
 
 func main() {
 	flag.Usage = usage
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println(versionStr)
+		return
+	}
 
 	if flag.NArg() > 1 {
 		fmt.Fprintf(os.Stderr, "only one file or content can be specified\n")
@@ -32,7 +40,7 @@ func main() {
 	var fn string
 	var in io.Reader
 	if *exprMode || *templateMode {
-		fn = "<inline>"
+		fn = "<input>"
 		in = strings.NewReader(flag.Arg(0))
 	} else {
 		fn = flag.Arg(0)
@@ -90,7 +98,7 @@ func processFile(fn string, in io.Reader) int {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: hclparse [options] [file or content]\n")
+	fmt.Fprintf(os.Stderr, "usage: hcl-parse [options] [file or content]\n")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
