@@ -81,7 +81,7 @@ $ hcl-parse main.hcl
           )
           (*hclsyntax.Attribute "obj"
             (*hclsyntax.ObjectConsExpr
-              (*hclsyntax.ObjectConsKeyExpr
+              (*hclsyntax.ObjectConsKeyExpr keyword="a"
               )
               (*hclsyntax.SplatExpr
                 (*hclsyntax.ScopeTraversalExpr "var.bar")
@@ -94,7 +94,7 @@ $ hcl-parse main.hcl
                 (*hclsyntax.ScopeTraversalExpr "var.baz")
                 (*hclsyntax.ScopeTraversalExpr "var.qux")
               )
-              (*hclsyntax.ObjectConsKeyExpr
+              (*hclsyntax.ObjectConsKeyExpr keyword="c"
               )
               (*hclsyntax.TupleConsExpr
                 (*hclsyntax.LiteralValueExpr "1")

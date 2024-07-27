@@ -148,6 +148,11 @@ func (w *walker) Enter(node hclsyntax.Node) hcl.Diagnostics {
 		fmt.Printf(`(%T "%s"`, node, opAsString(node.Op))
 	case *hclsyntax.UnaryOpExpr:
 		fmt.Printf(`(%T "%s"`, node, opAsString(node.Op))
+	case *hclsyntax.ObjectConsKeyExpr:
+		fmt.Printf(`(%T`, node)
+		if keyword := hcl.ExprAsKeyword(node.Wrapped); keyword != "" {
+			fmt.Printf(` keyword="%s"`, keyword)
+		}
 	default:
 		fmt.Printf("(%T", node)
 	}
